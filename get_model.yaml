@@ -1,0 +1,51 @@
+name: Build Model
+description: Loads a benchmark scenario and builds a model according to specified type.
+
+inputs:
+  - {name: scenario_path, type: Path}
+
+outputs:
+  - {name: model_path, type: Path}
+
+implementation:
+  container:
+    image: python:3.10
+    command:
+    - sh
+    - -c
+    - |
+      pip install avalanche-lib==0.6 torchvision
+      python3 -u -c """
+      import argparse, torch, pickle
+      from avalanche.models import SimpleMLP, SimpleCNN
+      from torchvision.models import resnet18
+      import torch.nn as nn
+
+      def get_model(name, num_classes):
+          if name.lower() == 'simplemlp':
+              return SimpleMLP(num_classes=num_classes)
+          elif name.lower() == 'simplecnn':
+              return SimpleCNN(num_classes=num_classes)
+          elif name.lower() == 'resnet18':
+              model = resnet18(pretrained=False)
+              model.fc = nn.Linear(model.fc.in_features, num_classes)
+              return model
+          else:
+              raise ValueError(f"Unknown model name: {name}")
+
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--scenario_path', type=str, required=True)
+      parser.add_argument('--model_path', type=str, required=True)
+      args = parser.parse_args()
+
+      with open(args.scenario_path, 'rb') as f:
+          scenario = pickle.load(f)
+      model_name = "simplemlp"
+      model = get_model(model_name, scenario.n_classes)
+      torch.save(model.state_dict(), args.model_path)
+      """
+    args:
+    - --scenario_path
+    - {inputPath: scenario_path}
+    - --model_path
+    - {outputPath: model_path}

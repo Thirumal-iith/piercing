@@ -1,0 +1,49 @@
+name: Train and Evaluate
+description: Trains and evaluates a continual learning strategy on the given benchmark.
+
+inputs:
+  - {name: strategy_path, type: Path}
+  - {name: scenario_path, type: Path}
+
+outputs:
+  - {name: results_path, type: Path}
+
+implementation:
+  container:
+    image: python:3.10
+    command:
+    - sh
+    - -c
+    - |
+      pip install avalanche-lib==0.6
+      python3 -u -c """
+      import argparse, pickle
+
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--strategy_path', type=str, required=True)
+      parser.add_argument('--scenario_path', type=str, required=True)
+      parser.add_argument('--results_path', type=str, required=True)
+      args = parser.parse_args()
+
+      with open(args.strategy_path, 'rb') as f:
+          cl_strategy = pickle.load(f)
+
+      with open(args.scenario_path, 'rb') as f:
+          scenario = pickle.load(f)
+
+      results = []
+      for experience in scenario.train_stream:
+          print("Start of experience:", experience.current_experience)
+          cl_strategy.train(experience)
+          results.append(cl_strategy.eval(scenario.test_stream))
+
+      with open(args.results_path, 'wb') as f:
+          pickle.dump(results, f)
+      """
+    args:
+    - --strategy_path
+    - {inputPath: strategy_path}
+    - --scenario_path
+    - {inputPath: scenario_path}
+    - --results_path
+    - {outputPath: results_path}

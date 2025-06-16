@@ -1,58 +1,49 @@
-# YAML for get_benchmark component
-name: Load Benchmark Scenario
-description: Loads a continual learning benchmark scenario using Avalanche.
+name: Generate Benchmark Scenario
+description: Creates a continual learning benchmark scenario using Avalanche.
+
 inputs:
-  - {name: benchmark_name, type: String}
-  - {name: n_experiences, type: Integer}
-  - {name: return_task_id, type: Boolean}
+  - {}
+
 outputs:
-  - {name: scenario, type: Dataset}
+  - {name: scenario_path, type: Path}
+
 implementation:
   container:
-    image: python:3.9
+    image: python:3.10
     command:
-      - sh
-      - -c
-      - |
-        (python3 -m pip install --quiet --no-warn-script-location avalanche torchvision || python3 -m pip install --quiet avalanche torchvision --user) && "$0" "$@"
-      - python3
-      - -u
-      - -c
-      - |
-        import argparse
-        import os
-        import json
-        from avalanche.benchmarks.classic import SplitMNIST, SplitCIFAR10, SplitCIFAR100, SplitTinyImageNet
+    - sh
+    - -c
+    - |
+      pip install avalanche-lib==0.6
+      python3 -u -c """
+      import argparse, pickle
+      from avalanche.benchmarks.classic import SplitMNIST, SplitCIFAR10, SplitCIFAR100, SplitTinyImageNet
 
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--benchmark_name", type=str, required=True)
-        parser.add_argument("--n_experiences", type=int, required=True)
-        parser.add_argument("--return_task_id", type=bool, required=True)
-        parser.add_argument("--scenario", type=str, required=True)
-        args = parser.parse_args()
+      benchmark_name = "splitmnist"
+      n_experiences = 5
+      return_task_id = False
 
-        benchmark_name = args.benchmark_name.lower()
+      def get_benchmark(name, n_exp, return_id):
+          name = name.lower()
+          if name == 'splitmnist':
+              return SplitMNIST(n_experiences=n_exp, return_task_id=return_id)
+          elif name == 'splitcifar10':
+              return SplitCIFAR10(n_experiences=n_exp, return_task_id=return_id)
+          elif name == 'splitcifar100':
+              return SplitCIFAR100(n_experiences=n_exp, return_task_id=return_id)
+          elif name == 'splittinyimagenet':
+              return SplitTinyImageNet(n_experiences=n_exp, return_task_id=return_id)
+          else:
+              raise ValueError(f"Unknown benchmark: {name}")
 
-        if benchmark_name == "splitmnist":
-            scenario = SplitMNIST(n_experiences=args.n_experiences, return_task_id=args.return_task_id)
-        elif benchmark_name == "splitcifar10":
-            scenario = SplitCIFAR10(n_experiences=args.n_experiences, return_task_id=args.return_task_id)
-        elif benchmark_name == "splitcifar100":
-            scenario = SplitCIFAR100(n_experiences=args.n_experiences, return_task_id=args.return_task_id)
-        elif benchmark_name == "splittinyimagenet":
-            scenario = SplitTinyImageNet(n_experiences=args.n_experiences, return_task_id=args.return_task_id)
-        else:
-            raise ValueError(f"Unknown benchmark: {args.benchmark_name}")
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--scenario_path', type=str, required=True)
+      args = parser.parse_args()
 
-        os.makedirs(os.path.dirname(args.scenario), exist_ok=True)
-        with open(args.scenario, "w") as f:
-            json.dump({"n_classes": scenario.n_classes}, f)
+      scenario = get_benchmark(benchmark_name, n_experiences, return_task_id)
+      with open("scenario.pkl", "wb") as f:
+          pickle.dump(scenario, f)
+      """
     args:
-      - --benchmark_name
-      - {inputValue: benchmark_name}
-      - --n_experiences
-      - {inputValue: n_experiences}
-      - --return_task_id
-      - {inputValue: return_task_id}
-      - --scenario
-      - {outputPath: scenario}
+    - --scenario_path
+    - {outputPath: scenario_path}
