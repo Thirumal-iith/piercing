@@ -1,8 +1,7 @@
 name: Generate Benchmark Scenario
 description: Creates a continual learning benchmark scenario using Avalanche.
 
-inputs:
-  - {}
+inputs: []
 
 outputs:
   - {name: scenario_path, type: Path}
@@ -41,7 +40,8 @@ implementation:
       args = parser.parse_args()
 
       scenario = get_benchmark(benchmark_name, n_experiences, return_task_id)
-      with open("scenario.pkl", "wb") as f:
+
+      with open(args.scenario_path, "wb") as f:
           pickle.dump(scenario, f)
       """
     args:
